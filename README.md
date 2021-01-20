@@ -3,18 +3,31 @@
 A Ruby Extension for InterSystems **Cache/IRIS** and **YottaDB**.
 
 Chris Munt <cmunt@mgateway.com>  
-23 January 2020, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
+20 January 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
 
-* Current Release: Version: 2.1; Revision 40 - Beta (23 January 2020)
+* Current Release: Version: 2.1; Revision 40a.
+* Two connectivity models to the InterSystems or YottaDB database are provided: High performance via the local database API or network based.
 * [Release Notes](#RelNotes) can be found at the end of this document.
 
+Contents
 
-## Overview
+* [Overview](#Overview") 
+* [Pre-requisites](#PreReq") 
+* [Installing mg\_ruby](#Install)
+* [Using mg\_ruby](#Using)
+* [Connecting to the database](#Connect)
+* [Invocation of database commands](#DBCommands)
+* [Invocation of database functions](#DBFunctions)
+* [Direct access to InterSystems classes (IRIS and Cache)](#DBClasses)
+* [License](#License)
+
+
+## <a name="Overview"></a> Overview
 
 **mg\_ruby** is an Open Source Ruby extension developed for InterSystems **Cache/IRIS** and the **YottaDB** database.  It will also work with the **GT.M** database and other **M-like** databases.
 
 
-## Pre-requisites
+## <a name="PreReq"></a> Pre-requisites 
 
 Ruby installation:
 
@@ -25,7 +38,8 @@ InterSystems **Cache/IRIS** or **YottaDB** (or similar M database):
        https://www.intersystems.com/
        https://yottadb.com/
 
-## Installing mg\_ruby
+
+## <a name="Install"></a> Installing mg\_ruby
 
 There are three parts to **mg\_ruby** installation and configuration.
 
@@ -77,37 +91,45 @@ Windows using the Microsoft Development Toolkit:
        nmake
        nmake install
 
+### Installing the M support routines
 
-### InterSystems Cache/IRIS
+The M support routines are required for:
 
-Log in to the Manager UCI and install the **zmgsi** routines held in either **/m/zmgsi\_cache.xml** or **/m/zmgsi\_iris.xml** as appropriate.
+* Network based access to databases.
 
-       do $system.OBJ.Load("/m/zmgsi_cache.xml","ck")
+Two M routines need to be installed (%zmgsi and %zmgsis).  These can be found in the *Service Integration Gateway* (**mgsi**) GitHub source code repository ([https://github.com/chrisemunt/mgsi](https://github.com/chrisemunt/mgsi)).  Note that it is not necessary to install the whole *Service Integration Gateway*, just the two M routines held in that repository.
 
-Change to your development UCI and check the installation:
+#### Installation for InterSystems Cache/IRIS
+
+Log in to the %SYS Namespace and install the **zmgsi** routines held in **/isc/zmgsi\_isc.ro**.
+
+       do $system.OBJ.Load("/isc/zmgsi_isc.ro","ck")
+
+Change to your development Namespace and check the installation:
 
        do ^%zmgsi
 
        M/Gateway Developments Ltd - Service Integration Gateway
-       Version: 3.2; Revision 5 (17 January 2020)
+       Version: 3.6; Revision 15 (6 November 2020)
 
-### YottaDB
 
-The instructions given here assume a standard 'out of the box' installation of **YottaDB** deployed in the following location:
+#### Installation for YottaDB
 
-       /usr/local/lib/yottadb/r122
+The instructions given here assume a standard 'out of the box' installation of **YottaDB** (version 1.30) deployed in the following location:
+
+       /usr/local/lib/yottadb/r130
 
 The primary default location for routines:
 
-       /root/.yottadb/r1.22_x86_64/r
+       /root/.yottadb/r1.30_x86_64/r
 
 Copy all the routines (i.e. all files with an 'm' extension) held in the GitHub **/yottadb** directory to:
 
-       /root/.yottadb/r1.22_x86_64/r
+       /root/.yottadb/r1.30_x86_64/r
 
 Change directory to the following location and start a **YottaDB** command shell:
 
-       cd /usr/local/lib/yottadb/r122
+       cd /usr/local/lib/yottadb/r130
        ./ydb
 
 Link all the **zmgsi** routines and check the installation:
@@ -117,21 +139,18 @@ Link all the **zmgsi** routines and check the installation:
        do ^%zmgsi
 
        M/Gateway Developments Ltd - Service Integration Gateway
-       Version: 3.2; Revision 5 (17 January 2020)
-
+       Version: 3.6; Revision 15 (6 November 2020)
 
 Note that the version of **zmgsi** is successfully displayed.
 
 
-## Setting up the network service (if required)
-
-The network setup described here is only required if TCP based connectivity is to be used to connect your Ruby code to the database, as opposed to the API based approach described later.
+### Setting up the network service (for network based connectivity only)
 
 The default TCP server port for **zmgsi** is **7041**.  If you wish to use an alternative port then modify the following instructions accordingly.
 
-Ruby code using the **mg\_ruby** methods will, by default, expect the database server to be listening on port **7041** of the local server (localhost).  However, **mg\_ruby** provides the functionality to modify these default settings at run-time.  It is not necessary for the web server/Ruby installation to reside on the same host as the database server.
+Ruby code using the **mg\_ruby** functions will, by default, expect the database server to be listening on port **7041** of the local server (localhost).  However, **mg\_ruby** provides the functionality to modify these default settings at run-time.  It is not necessary for the Ruby installation to reside on the same host as the database server.
 
-### InterSystems Cache/IRIS
+#### InterSystems Cache/IRIS
 
 Start the Cache/IRIS-hosted concurrent TCP service in the Manager UCI:
 
@@ -139,23 +158,27 @@ Start the Cache/IRIS-hosted concurrent TCP service in the Manager UCI:
 
 To use a server TCP port other than 7041, specify it in the start-up command (as opposed to using zero to indicate the default port of 7041).
 
-### YottaDB
+#### YottaDB
 
 Network connectivity to **YottaDB** is managed via the **xinetd** service.  First create the following launch script (called **zmgsi\_ydb** here):
 
-       /usr/local/lib/yottadb/r122/zmgsi_ydb
+       /usr/local/lib/yottadb/r130/zmgsi_ydb
 
 Content:
 
        #!/bin/bash
-       cd /usr/local/lib/yottadb/r122
+       cd /usr/local/lib/yottadb/r130
        export ydb_dir=/root/.yottadb
-       export ydb_dist=/usr/local/lib/yottadb/r122
-       export ydb_routines="/root/.yottadb/r1.22_x86_64/o*(/root/.yottadb/r1.22_x86_64/r /root/.yottadb/r) /usr/local/lib/yottadb/r122/libyottadbutil.so"
-       export ydb_gbldir="/root/.yottadb/r1.22_x86_64/g/yottadb.gld"
+       export ydb_dist=/usr/local/lib/yottadb/r130
+       export ydb_routines="/root/.yottadb/r1.30_x86_64/o*(/root/.yottadb/r1.30_x86_64/r /root/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so"
+       export ydb_gbldir="/root/.yottadb/r1.30_x86_64/g/yottadb.gld"
        $ydb_dist/ydb -r xinetd^%zmgsis
 
-Create the **xinetd** script (called **zmgsi_xinetd** here): 
+Note that you should, if necessary, modify the permissions on this file so that it is executable.  For example:
+
+       chmod a=rx /usr/local/lib/yottadb/r130/zmgsi_ydb
+
+Create the **xinetd** script (called **zmgsi\_xinetd** here): 
 
        /etc/xinetd.d/zmgsi_xinetd
 
@@ -169,10 +192,10 @@ Content:
             socket_type     = stream
             wait            = no
             user            = root
-            server          = /usr/local/lib/yottadb/r122/zmgsi_ydb
+            server          = /usr/local/lib/yottadb/r130/zmgsi_ydb
        }
 
-* Note: sample copies of **zmgsi\_xinetd** and **zmgsi\_ydb** are included in the **/unix** directory.
+* Note: sample copies of **zmgsi\_xinetd** and **zmgsi\_ydb** are included in the **/unix** directory of the **mgsi** GitHub repository [here](https://github.com/chrisemunt/mgsi).
 
 Edit the services file:
 
@@ -186,7 +209,15 @@ Finally restart the **xinetd** service:
 
        /etc/init.d/xinetd restart
 
-## Using mg\_ruby
+
+### Resources used by zmgsi
+
+The **zmgsi** server-side code will write to the following global:
+
+* **^zmgsi**: The event Log. 
+
+
+## <a name="Using"></a> Using mg\_ruby
 
 Ruby programs may refer to, and load, the **mg\_ruby** module using the following directive at the top of the script.
 
@@ -207,7 +238,7 @@ Then methods can be invoked as:
        <name>.<method>
 
 
-### Connecting the database.
+## <a name="Connect"></a> Connecting to the database
 
 By default, **mg\_ruby** will connect to the server over TCP - the default parameters for which being the database listening locally on port **7041**. This can be modified using the following function.
 
@@ -219,11 +250,11 @@ Example:
 
        mg_ruby.m_set_host("localhost", 7041, "", "")
 
-#### Connecting to the database via its API.
+### Connecting to the database via its API.
 
 As an alternative to connecting to the database using TCP based connectivity, **mg\_ruby** provides the option of high-performance embedded access to a local installation of the database via its API.
 
-##### InterSystems Caché or IRIS.
+#### InterSystems Caché or IRIS.
 
 Use the following functions to bind to the database API.
 
@@ -251,7 +282,7 @@ Before leaving your Ruby application, it is good practice to gracefully release 
 
        mg_ruby.m_release_server_api()
 
-##### YottaDB
+#### YottaDB
 
 Use the following function to bind to the database API.
 
@@ -268,7 +299,7 @@ Where:
 
 Example:
 
-This example assumes that the YottaDB installation is in: **/usr/local/lib/yottadb/r122**. 
+This example assumes that the YottaDB installation is in: **/usr/local/lib/yottadb/r130**. 
 This is where the **libyottadb.so** library is found.
 Also, in this directory, as indicated in the environment variables, the YottaDB routine interface file resides (**zmgsi.ci** in this example).  The interface file must contain the following line:
 
@@ -278,13 +309,13 @@ Moving on to the Ruby code for binding to the YottaDB database.  Modify the valu
 
        envvars = "";
        envvars = envvars + "ydb_dir=/root/.yottadb\n"
-       envvars = envvars + "ydb_rel=r1.22_x86_64\n"
-       envvars = envvars + "ydb_gbldir=/root/.yottadb/r1.22_x86_64/g/yottadb.gld\n"
-       envvars =envvars + "ydb_routines=/root/.yottadb/r1.22_x86_64/o*(/root/.yottadb/r1.22_x86_64/r root/.yottadb/r) /usr/local/lib/yottadb/r122/libyottadbutil.so\n"
-       envvars = envvars + "ydb_ci=/usr/local/lib/yottadb/r122/zmgsi.ci\n"
+       envvars = envvars + "ydb_rel=r1.30_x86_64\n"
+       envvars = envvars + "ydb_gbldir=/root/.yottadb/r1.30_x86_64/g/yottadb.gld\n"
+       envvars =envvars + "ydb_routines=/root/.yottadb/r1.30_x86_64/o*(/root/.yottadb/r1.30_x86_64/r root/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so\n"
+       envvars = envvars + "ydb_ci=/usr/local/lib/yottadb/r130/zmgsi.ci\n"
        envvars = envvars + "\n"
 
-       result = mg_ruby.m_bind_server_api("YottaDB", "/usr/local/lib/yottadb/r122", "", "", envvars, "")
+       result = mg_ruby.m_bind_server_api("YottaDB", "/usr/local/lib/yottadb/r130", "", "", envvars, "")
 
 The bind function will return '1' for success and '0' for failure.
 
@@ -293,7 +324,7 @@ Before leaving your Ruby application, it is good practice to gracefully release 
        mg_ruby.m_release_server_api()
 
 
-## Invoking database commands from Ruby script
+## <a name="DBCommands"></a> Invocation of database commands
 
 Before invoking database functionality, the following simple script can be used to check that **mg\_ruby** is successfully installed.
 
@@ -317,7 +348,7 @@ Equivalent Ruby code:
 **mg\_ruby** provides functions to invoke all database commands and functions.
 
 
-#### Set a record
+### Set a record
 
        result = mg_ruby.m_set(<global>, <key>, <data>)
       
@@ -325,7 +356,7 @@ Example:
 
        result = mg_ruby.m_set("^Person", 1, "Chris Munt")
 
-#### Get a record
+### Get a record
 
        result = mg_ruby.m_get(<global>, <key>)
       
@@ -333,7 +364,7 @@ Example:
 
        result = mg_ruby.m_get("^Person", 1)
 
-#### Delete a record
+### Delete a record
 
        result = mg_ruby.m_delete(<global>, <key>)
       
@@ -342,7 +373,7 @@ Example:
        result = mg_ruby.m_delete("^Person", 1)
 
 
-#### Check whether a record is defined
+### Check whether a record is defined
 
        result = mg_ruby.m_defined(<global>, <key>)
       
@@ -351,7 +382,7 @@ Example:
        result = mg_ruby.m_defined("^Person", 1)
 
 
-#### Parse a set of records (in order)
+### Parse a set of records (in order)
 
        result = mg_ruby.m_order(<global>, <key>)
       
@@ -363,7 +394,7 @@ Example:
        end
 
 
-#### Parse a set of records (in reverse order)
+### Parse a set of records (in reverse order)
 
        result = mg_ruby.m_previous(<global>, <key>)
       
@@ -374,7 +405,8 @@ Example:
           puts key + " = " + mg_ruby.m_get("^Person", key)
        end
 
-## Invocation of database functions
+
+## <a name="DBFunctions"> Invocation of database functions
 
        result = mg_ruby.m_function(<function>, <parameters>)
       
@@ -390,9 +422,9 @@ Ruby invocation:
       result = mg_ruby.m_function("add^math", 2, 3);
 
 
-## Direct access to InterSystems classes (IRIS and Cache)
+## <a name="DBClasses"> Direct access to InterSystems classes (IRIS and Cache)
 
-#### Invocation of a ClassMethod
+### Invocation of a ClassMethod
 
        result = mg_ruby.m_classmethod(<class_name>, <classmethod_name>, <parameters>);
       
@@ -400,15 +432,10 @@ Example (Encode a date to internal storage format):
 
         result = mg_ruby.m_classmethod("%Library.Date", "DisplayToLogical", "10/10/2019");
 
-## Resources used by zmgsi
 
-The **zmgsi** server-side code will write to the following global:
+## <a name="License"></a> License
 
-* **^zmgsi**: The event Log. 
-
-## License
-
-Copyright (c) 2018-2020 M/Gateway Developments Ltd,
+Copyright (c) 2018-2021 M/Gateway Developments Ltd,
 Surrey UK.                                                      
 All rights reserved.
  
@@ -429,4 +456,6 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 * Initial Release
 
+### v2.1.40a (20 January 2021)
 
+* Restructure and update the documentation.
