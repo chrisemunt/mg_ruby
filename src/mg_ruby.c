@@ -30,14 +30,19 @@ Change Log:
 Version 2.0.39 17 October 2009:
    First release (as Freeware).
 
-Version 2.1.40 10 December 2019:
+Version 2.1.40 10 December 2019; 20 January 2020:
    Update code base.
    First Open Source release.
 
+Version 2.2.41 16 February 2021:
+   Introduce support for M transaction processing: tstart, $tlevel, tcommit, trollback.
+   Introduce support for the M increment function.
+   Allow the DB server response timeout to be modified via the mg_ruby.m_set_timeout() function.
+   - mg_ruby.m_set_timeout(<dbhandle>,<timeout>)
 */
 
 
-#define MG_VERSION               "2.1.40"
+#define MG_VERSION               "2.2.41"
 
 #define MG_MAX_KEY               256
 #define MG_MAX_PAGE              256
@@ -243,7 +248,6 @@ static VALUE ex_m_set_uci(VALUE self, VALUE r_uci)
    strcpy(p_page->p_srv->uci, uci);
 
    return rb_str_new2("");
-
 }
 
 
@@ -260,6 +264,25 @@ static VALUE ex_m_set_server(VALUE self, VALUE r_server)
    server = mg_get_string(r_server, &r, &len);
 
    strcpy(p_page->p_srv->server, server);
+
+   return rb_str_new2("");
+}
+
+
+/* v2.2.41 */
+static VALUE ex_m_set_timeout(VALUE self, VALUE r_timeout)
+{
+   int phndle, timeout;
+   MGPAGE *p_page;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   timeout = mg_get_integer(r_timeout);
+
+   if (timeout >= 0) {
+      p_page->p_srv->timeout = timeout;
+   }
 
    return rb_str_new2("");
 
@@ -1081,6 +1104,295 @@ static VALUE ex_ma_previous(VALUE self, VALUE r_global, VALUE key)
    mg_set_list_item(key, max, p);
 
    return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+/* v2.2.41 */
+static VALUE ex_m_increment(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+
+   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+      return mg_r_nil;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("m_increment");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "I", MG_PRODUCT);
+
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) vargs.global, (int) vargs.global_len, (short) ifc[0], (short) ifc[1]);
+
+   for (n = 1; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+/* v2.2.41 */
+static VALUE ex_m_tstart(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+
+   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+      return mg_r_nil;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("m_tstart");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "a", MG_PRODUCT);
+
+   for (n = 0; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_m_tlevel(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+
+   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+      return mg_r_nil;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("m_tlevel");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "b", MG_PRODUCT);
+
+   for (n = 0; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_m_tcommit(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+
+   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+      return mg_r_nil;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("m_tcommit");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "c", MG_PRODUCT);
+
+   for (n = 0; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_m_trollback(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+
+   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+      return mg_r_nil;
+
+   phndle = 0;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("m_trollback");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "d", MG_PRODUCT);
+
+   for (n = 0; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+/* v2.2.41 */
+static VALUE ex_m_sleep(VALUE self, VALUE r_msecs)
+{
+   int msecs;
+
+   msecs = mg_get_integer(r_msecs);
+   mg_sleep((unsigned long) msecs);
+   msecs = 0;
+
+   return rb_str_new2("");
 }
 
 
@@ -3134,6 +3446,7 @@ void Init_mg_ruby() {
    rb_define_method(mg_ruby, "m_set_host", ex_m_set_host, 4);
    rb_define_method(mg_ruby, "m_set_uci", ex_m_set_uci, 1);
    rb_define_method(mg_ruby, "m_set_server", ex_m_set_server, 1);
+   rb_define_method(mg_ruby, "m_set_timeout", ex_m_set_timeout, 1);
 
    rb_define_method(mg_ruby, "m_bind_server_api", ex_m_bind_server_api, 6);
    rb_define_method(mg_ruby, "m_release_server_api", ex_m_release_server_api, 0);
@@ -3157,6 +3470,14 @@ void Init_mg_ruby() {
    rb_define_method(mg_ruby, "ma_order", ex_ma_order, 2);
    rb_define_method(mg_ruby, "m_previous", ex_m_previous, -1);
    rb_define_method(mg_ruby, "ma_previous", ex_ma_previous, 2);
+
+   /* v2.2.41 */
+   rb_define_method(mg_ruby, "m_increment", ex_m_increment, -1);
+   rb_define_method(mg_ruby, "m_tstart", ex_m_tstart, -1);
+   rb_define_method(mg_ruby, "m_tlevel", ex_m_tlevel, -1);
+   rb_define_method(mg_ruby, "m_tcommit", ex_m_tcommit, -1);
+   rb_define_method(mg_ruby, "m_trollback", ex_m_trollback, -1);
+   rb_define_method(mg_ruby, "m_sleep", ex_m_sleep, 1);
 
    rb_define_method(mg_ruby, "ma_merge_to_db", ex_ma_merge_to_db, 4);
    rb_define_method(mg_ruby, "ma_merge_from_db", ex_ma_merge_from_db, 4);
