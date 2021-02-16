@@ -284,7 +284,7 @@ Before invoking database functionality, the following simple script can be used 
 
 This should return something like:
 
-       M/Gateway Developments Ltd. - mg_ruby: Ruby Gateway to M - Version 2.1.40
+       M/Gateway Developments Ltd. - mg_ruby: Ruby Gateway to M - Version 2.2.41
 
 Now consider the following database script:
 
@@ -380,7 +380,7 @@ M routine called 'math':
 
 Ruby invocation:
 
-      result = mg_ruby.m_function("add^math", 2, 3);
+      result = mg_ruby.m_function("add^math", 2, 3)
 
 
 ## <a name="TProcessing"></a> Transaction Processing
@@ -391,57 +391,57 @@ M DB Servers implement Transaction Processing by means of the methods described 
 
 ### Start a Transaction
 
-       result = mg_ruby.m_tstart();
+       result = mg_ruby.m_tstart()
 
 * On successful completion this method will return zero, or an error code on failure.
 
 Example:
 
-       result = mg_ruby.m_tstart();
+       result = mg_ruby.m_tstart()
 
 
 ### Determine the Transaction Level
 
-       result = mg_ruby.m_tlevel();
+       result = mg_ruby.m_tlevel()
 
 * Transactions can be nested and this method will return the level of nesting.  If no Transaction is active this method will return zero.  Otherwise a positive integer will be returned to represent the current depth of Transaction nesting.
 
 Example:
 
-       tlevel = mg_ruby.m_tlevel();
+       tlevel = mg_ruby.m_tlevel()
 
 
 ### Commit a Transaction
 
-       result = mg_ruby.m_tcommit();
+       result = mg_ruby.m_tcommit()
 
 * On successful completion this method will return zero, or an error code on failure.
 
 Example:
 
-       result = mg_ruby.m_tcommit();
+       result = mg_ruby.m_tcommit()
 
 
 ### Rollback a Transaction
 
-       result = mg_ruby.m_trollback();
+       result = mg_ruby.m_trollback()
 
 * On successful completion this method will return zero, or an error code on failure.
 
 Example:
 
-       result = mg_ruby.m_trollback();
+       result = mg_ruby.m_trollback()
 
 
 ## <a name="DBClasses"> Direct access to InterSystems classes (IRIS and Cache)
 
 ### Invocation of a ClassMethod
 
-       result = mg_ruby.m_classmethod(<class_name>, <classmethod_name>, <parameters>);
+       result = mg_ruby.m_classmethod(<class_name>, <classmethod_name>, <parameters>)
       
 Example (Encode a date to internal storage format):
 
-        result = mg_ruby.m_classmethod("%Library.Date", "DisplayToLogical", "10/10/2019");
+        result = mg_ruby.m_classmethod("%Library.Date", "DisplayToLogical", "10/10/2019")
 
 
 ## <a name="License"></a> License
