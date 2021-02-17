@@ -477,4 +477,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 	* Available with DB Superserver v4 and later. 
 * Introduce support for the M increment function.
 * Allow the DB server response timeout to be modified via the mg\_ruby.m\_set\_timeout() function.
-	* mg_ruby.m\_set\_timeout(<timeout>)
+	* mg_ruby.m\_set\_timeout([timeout])
