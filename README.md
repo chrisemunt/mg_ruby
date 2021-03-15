@@ -3,9 +3,9 @@
 A Ruby Extension for InterSystems **Cache/IRIS** and **YottaDB**.
 
 Chris Munt <cmunt@mgateway.com>  
-16 February 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
+14 March 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
 
-* Current Release: Version: 2.2; Revision 41.
+* Current Release: Version: 2.2; Revision 42.
 * Two connectivity models to the InterSystems or YottaDB database are provided: High performance via the local database API or network based.
 * [Release Notes](#RelNotes) can be found at the end of this document.
 
@@ -144,6 +144,15 @@ Link all the **zmgsi** routines and check the installation:
 
 Note that the version of **zmgsi** is successfully displayed.
 
+Finally, add the following lines to the interface file (**zmgsi.ci** in the example used in the db.open() method).
+
+       sqlemg: ydb_string_t * sqlemg^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t *)
+       sqlrow: ydb_string_t * sqlrow^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t *)
+       sqldel: ydb_string_t * sqldel^%zmgsis(I:ydb_string_t*, I:ydb_string_t *)
+       ifc_zmgsis: ydb_string_t * ifc^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t*)
+
+A copy of this file can be downloaded from the **/unix** directory of the  **mgsi** GitHub repository [here](https://github.com/chrisemunt/mgsi)
+
 
 ### Starting the DB Superserver
 
@@ -253,9 +262,12 @@ Example:
 
 This example assumes that the YottaDB installation is in: **/usr/local/lib/yottadb/r130**. 
 This is where the **libyottadb.so** library is found.
-Also, in this directory, as indicated in the environment variables, the YottaDB routine interface file resides (**zmgsi.ci** in this example).  The interface file must contain the following line:
+Also, in this directory, as indicated in the environment variables, the YottaDB routine interface file resides (**zmgsi.ci** in this example).  The interface file must contain the following lines:
 
-       ifc_zmgsis: ydb_char_t * ifc^%zmgsis(I:ydb_char_t*, I:ydb_char_t *, I:ydb_char_t*)
+       sqlemg: ydb_string_t * sqlemg^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t *)
+       sqlrow: ydb_string_t * sqlrow^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t *)
+       sqldel: ydb_string_t * sqldel^%zmgsis(I:ydb_string_t*, I:ydb_string_t *)
+       ifc_zmgsis: ydb_string_t * ifc^%zmgsis(I:ydb_string_t*, I:ydb_string_t *, I:ydb_string_t*)
 
 Moving on to the Ruby code for binding to the YottaDB database.  Modify the values of these environment variables in accordance with your own YottaDB installation.  Note that each line is terminated with a linefeed character, with a double linefeed at the end of the list.
 
@@ -263,7 +275,7 @@ Moving on to the Ruby code for binding to the YottaDB database.  Modify the valu
        envvars = envvars + "ydb_dir=/root/.yottadb\n"
        envvars = envvars + "ydb_rel=r1.30_x86_64\n"
        envvars = envvars + "ydb_gbldir=/root/.yottadb/r1.30_x86_64/g/yottadb.gld\n"
-       envvars =envvars + "ydb_routines=/root/.yottadb/r1.30_x86_64/o*(/root/.yottadb/r1.30_x86_64/r root/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so\n"
+       envvars = envvars + "ydb_routines=/root/.yottadb/r1.30_x86_64/o*(/root/.yottadb/r1.30_x86_64/r root/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so\n"
        envvars = envvars + "ydb_ci=/usr/local/lib/yottadb/r130/zmgsi.ci\n"
        envvars = envvars + "\n"
 
@@ -387,8 +399,6 @@ Ruby invocation:
 
 M DB Servers implement Transaction Processing by means of the methods described in this section.
 
-* With YottaDB, these methods are only available over network based connectivity to the DB Server.
-
 ### Start a Transaction
 
        result = mg_ruby.m_tstart()
@@ -478,3 +488,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 * Introduce support for the M increment function.
 * Allow the DB server response timeout to be modified via the mg\_ruby.m\_set\_timeout() function.
 	* mg_ruby.m\_set\_timeout([timeout])
+
+### v2.2.42 (14 March 2021)
+
+* Introduce support for YottaDB Transaction Processing over API based connectivity.
+	* This functionality was previously only available over network-based connectivity to YottaDB.
