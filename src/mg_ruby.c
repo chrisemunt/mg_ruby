@@ -39,10 +39,14 @@ Version 2.2.41 16 February 2021:
    Introduce support for the M increment function.
    Allow the DB server response timeout to be modified via the mg_ruby.m_set_timeout() function.
    - mg_ruby.m_set_timeout(<dbhandle>,<timeout>)
+
+Version 2.2.42 14 March 2021:
+   Introduce support for YottaDB Transaction Processing over API based connectivity.
+   - This functionality was previously only available over network-based connectivity to YottaDB.
 */
 
 
-#define MG_VERSION               "2.2.41"
+#define MG_VERSION               "2.2.42"
 
 #define MG_MAX_KEY               256
 #define MG_MAX_PAGE              256
