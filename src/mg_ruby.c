@@ -43,10 +43,14 @@ Version 2.2.41 16 February 2021:
 Version 2.2.42 14 March 2021:
    Introduce support for YottaDB Transaction Processing over API based connectivity.
    - This functionality was previously only available over network-based connectivity to YottaDB.
+
+Version 2.3.43 20 April 2021:
+   Introduce improved support for InterSystems Objects for the standard (PHP/Python/Ruby) connectivity protocol.
+
 */
 
 
-#define MG_VERSION               "2.2.42"
+#define MG_VERSION               "2.3.43"
 
 #define MG_MAX_KEY               256
 #define MG_MAX_PAGE              256
@@ -110,6 +114,11 @@ typedef struct tagMGPAGE {
    MGSRV *     p_srv;
 } MGPAGE;
 
+typedef struct tagMGMCLASS {
+   int         phndle;
+   int         oref;
+} MGMCLASS;
+
 
 static MGPAGE gpage;
 static MGPAGE *tp_page[MG_MAX_PAGE] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
@@ -120,20 +129,45 @@ static char minit[256] = {'\0'};
 
 VALUE mg_r_nil    = Qnil;
 VALUE mg_ruby     = Qnil;
+VALUE mg_mclass   = Qnil; /* v2.3.43 */
 
-int         mg_type                    (VALUE item);
-int         mg_get_array_size          (VALUE rb_array);
-int         mg_get_integer             (VALUE item);
-double      mg_get_float               (VALUE item);
-char *      mg_get_string              (VALUE item, VALUE * item_tmp, int *size);
-int         mg_get_vargs               (int argc, VALUE *argv, MGVARGS *pvargs);
-int         mg_get_keys                (VALUE keys, MGSTR * ckeys, VALUE * keys_tmp, char *krec);
-int         mg_set_list_item           (VALUE list, int index, VALUE item);
-int         mg_kill_list               (VALUE list);
-int         mg_kill_list_item          (VALUE list, int index);
 
-MGPAGE *    mg_ppage                   (int phndle);
-int         mg_ppage_init              (MGPAGE * p_page);
+int            mg_type                    (VALUE item);
+int            mg_get_array_size          (VALUE rb_array);
+int            mg_get_integer             (VALUE item);
+double         mg_get_float               (VALUE item);
+char *         mg_get_string              (VALUE item, VALUE * item_tmp, int *size);
+int            mg_get_vargs               (int argc, VALUE *argv, MGVARGS *pvargs, int context);
+int            mg_get_keys                (VALUE keys, MGSTR * ckeys, VALUE * keys_tmp, char *krec);
+int            mg_set_list_item           (VALUE list, int index, VALUE item);
+int            mg_kill_list               (VALUE list);
+int            mg_kill_list_item          (VALUE list, int index);
+
+MGPAGE *       mg_ppage                   (int phndle);
+int            mg_ppage_init              (MGPAGE * p_page);
+
+/* v2.3.43 */
+void           mclass_free                (void * data);
+size_t         mclass_size                (const void* data);
+VALUE          mclass_alloc               (VALUE self);
+VALUE          mclass_m_initialize        (VALUE self, VALUE rb_oref, VALUE rb_phndle);
+static VALUE   ex_m_mclass                ();
+static VALUE   ex_mclass_method           (int argc, VALUE *argv, VALUE self);
+static VALUE   ex_mclass_getproperty      (VALUE self, VALUE r_pname);
+static VALUE   ex_mclass_setproperty      (VALUE self, VALUE r_pname, VALUE p_pvalue);
+static VALUE   ex_mclass_close            (VALUE self);
+
+
+static const rb_data_type_t mclass_type = {
+	.wrap_struct_name = "mclass",
+	.function = {
+		.dmark = NULL,
+		.dfree = mclass_free,
+		.dsize = mclass_size,
+	},
+	.data = NULL,
+	.flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
 
 
 /*
@@ -371,7 +405,7 @@ static VALUE ex_m_set(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -499,7 +533,7 @@ static VALUE ex_m_get(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -620,7 +654,7 @@ static VALUE ex_m_kill(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -743,7 +777,7 @@ static VALUE ex_m_data(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -866,7 +900,7 @@ static VALUE ex_m_order(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -993,7 +1027,7 @@ static VALUE ex_m_previous(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1121,7 +1155,7 @@ static VALUE ex_m_increment(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1180,7 +1214,7 @@ static VALUE ex_m_tstart(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1234,7 +1268,7 @@ static VALUE ex_m_tlevel(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1288,7 +1322,7 @@ static VALUE ex_m_tcommit(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1342,7 +1376,7 @@ static VALUE ex_m_trollback(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -1692,7 +1726,7 @@ static VALUE ex_m_function(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -2016,7 +2050,7 @@ static VALUE ex_m_classmethod(int argc, VALUE *argv, VALUE self)
    MGPAGE *p_page;
    MGVARGS vargs;
 
-   if ((max = mg_get_vargs(argc, argv, &vargs)) == -1)
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
       return mg_r_nil;
 
    phndle = 0;
@@ -2061,7 +2095,319 @@ static VALUE ex_m_classmethod(int argc, VALUE *argv, VALUE self)
       return mg_r_nil;
    }
 
+   if (!strncmp((char *) p_buf->p_buffer + 5, "co", 2)) { /* v2.3.43 */
+      int oref;
+      VALUE mclass;
+
+      p_buf->p_buffer[p_buf->data_size] = '\0';
+      oref = (int) strtol(p_buf->p_buffer + MG_RECV_HEAD, NULL, 10);
+
+      mclass = rb_funcall(mg_mclass, rb_intern("new"), 2, rb_int_new(oref), rb_int_new(phndle));
+
+      return mclass;
+   }
+
    return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+/* v2.3.43 */
+void mclass_free(void *data)
+{
+   mg_free(data, 0);
+}
+
+
+size_t mclass_size(const void *data)
+{
+   return sizeof(MGMCLASS);
+}
+
+
+VALUE mclass_alloc(VALUE self)
+{
+   MGMCLASS *pmclass;
+
+   /* allocate */
+   pmclass = (MGMCLASS *) mg_malloc(sizeof(MGMCLASS), 0);
+
+   /* wrap */
+   return TypedData_Wrap_Struct(self, &mclass_type, pmclass);
+}
+
+
+VALUE mclass_m_initialize(VALUE self, VALUE rb_oref, VALUE rb_phndle)
+{
+   MGMCLASS *pmclass;
+   /* unwrap */
+
+   TypedData_Get_Struct(self, MGMCLASS, &mclass_type, pmclass);
+
+   pmclass->oref = NUM2INT(rb_oref);
+   pmclass->phndle = NUM2INT(rb_phndle);
+
+   return self;
+}
+
+
+static VALUE ex_m_mclass()
+{
+   VALUE cmclass;
+
+   cmclass = rb_define_class("MCLASS", rb_cObject);
+/*
+   rb_define_method(mg_ruby, "initialize", t_init, 0);
+   rb_define_method(mg_ruby, "add", t_add, 1);
+*/
+   rb_define_alloc_func(cmclass, mclass_alloc);
+
+   rb_define_method(cmclass, "initialize", mclass_m_initialize, 2);
+   rb_define_method(cmclass, "method", ex_mclass_method, -1);
+   rb_define_method(cmclass, "getproperty", ex_mclass_getproperty, 1);
+   rb_define_method(cmclass, "setproperty", ex_mclass_setproperty, 2);
+
+   rb_define_method(cmclass, "close", ex_mclass_close, 0);
+/*
+   rb_define_attr(cmclass, "myvar", 1, 1);
+*/
+
+   return cmclass;
+}
+
+
+/* v2.3.43 */
+static VALUE ex_mclass_method(int argc, VALUE *argv, VALUE self)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, max;
+   char ifc[4];
+   char buffer[32];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGVARGS vargs;
+   MGMCLASS *pmclass;
+   /* unwrap */
+
+   TypedData_Get_Struct(self, MGMCLASS, &mclass_type, pmclass);
+
+   if ((max = mg_get_vargs(argc, argv, &vargs, 0)) == -1)
+      return mg_r_nil;
+
+   phndle = pmclass->phndle;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("mclass_method");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "j", MG_PRODUCT);
+
+   sprintf(buffer, "%d", pmclass->oref);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) buffer, (int) strlen((char *) buffer), (short) ifc[0], (short) ifc[1]);
+
+   for (n = 0; n < max; n ++) {
+      ifc[0] = 0;
+      ifc[1] = MG_TX_DATA;
+      mg_request_add(p_page->p_srv, chndle, p_buf, vargs.cvars[n].ps, vargs.cvars[n].size, (short) ifc[0], (short) ifc[1]);
+   }
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   if (!strncmp((char *) p_buf->p_buffer + 5, "co", 2)) { /* v2.3.43 */
+      int oref;
+      VALUE mclass;
+
+      p_buf->p_buffer[p_buf->data_size] = '\0';
+      oref = (int) strtol(p_buf->p_buffer + MG_RECV_HEAD, NULL, 10);
+
+      mclass = rb_funcall(mg_mclass, rb_intern("new"), 2, rb_int_new(oref), rb_int_new(phndle));
+
+      return mclass;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_mclass_getproperty(VALUE self, VALUE r_pname)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, len;
+   char ifc[4];
+   char buffer[32];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGMCLASS *pmclass;
+   char *cpname;
+   VALUE rpname;
+
+   /* unwrap */
+
+   TypedData_Get_Struct(self, MGMCLASS, &mclass_type, pmclass);
+
+   phndle = pmclass->phndle;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("mclass_getproperty");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "h", MG_PRODUCT);
+
+   sprintf(buffer, "%d", pmclass->oref);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) buffer, (int) strlen((char *) buffer), (short) ifc[0], (short) ifc[1]);
+
+   cpname = mg_get_string(r_pname, &rpname, &len);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) cpname, (int) len, (short) ifc[0], (short) ifc[1]);
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   if (!strncmp((char *) p_buf->p_buffer + 5, "co", 2)) { /* v2.3.43 */
+      int oref;
+      VALUE mclass;
+
+      p_buf->p_buffer[p_buf->data_size] = '\0';
+      oref = (int) strtol(p_buf->p_buffer + MG_RECV_HEAD, NULL, 10);
+
+      mclass = rb_funcall(mg_mclass, rb_intern("new"), 2, rb_int_new(oref), rb_int_new(phndle));
+
+      return mclass;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_mclass_setproperty(VALUE self, VALUE r_pname, VALUE r_pvalue)
+{
+   MGBUF mgbuf, *p_buf;
+   int n, len;
+   char ifc[4];
+   char buffer[32];
+   int chndle, phndle;
+   MGPAGE *p_page;
+   MGMCLASS *pmclass;
+   char *cpname, *cpvalue;
+   VALUE rpname, rpvalue;
+
+   /* unwrap */
+
+   TypedData_Get_Struct(self, MGMCLASS, &mclass_type, pmclass);
+
+   phndle = pmclass->phndle;
+   p_page = mg_ppage(phndle);
+
+   p_buf = &mgbuf;
+   mg_buf_init(p_buf, MG_BUFSIZE, MG_BUFSIZE);
+
+   MG_FTRACE("mclass_getproperty");
+
+   n = mg_db_connect(p_page->p_srv, &chndle, 1);
+
+   if (!n) {
+      MG_ERROR(p_page->p_srv->error_mess);
+      return mg_r_nil;
+   }
+
+   mg_request_header(p_page->p_srv, p_buf, "i", MG_PRODUCT);
+
+   sprintf(buffer, "%d", pmclass->oref);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) buffer, (int) strlen((char *) buffer), (short) ifc[0], (short) ifc[1]);
+
+   cpname = mg_get_string(r_pname, &rpname, &len);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) cpname, (int) len, (short) ifc[0], (short) ifc[1]);
+
+   cpvalue = mg_get_string(r_pvalue, &rpvalue, &len);
+   ifc[0] = 0;
+   ifc[1] = MG_TX_DATA;
+   mg_request_add(p_page->p_srv, chndle, p_buf, (unsigned char *) cpvalue, (int) len, (short) ifc[0], (short) ifc[1]);
+
+   MG_MEMCHECK("Insufficient memory to process request", 1);
+
+   mg_db_send(p_page->p_srv, chndle, p_buf, 1);
+
+   mg_db_receive(p_page->p_srv, chndle, p_buf, MG_BUFSIZE, 0);
+
+   MG_MEMCHECK("Insufficient memory to process response", 0);
+
+   mg_db_disconnect(p_page->p_srv, chndle, 1);
+
+   if ((n = mg_get_error(p_page->p_srv, p_buf->p_buffer))) {
+      MG_ERROR(p_buf->p_buffer + MG_RECV_HEAD);
+      return mg_r_nil;
+   }
+
+   if (!strncmp((char *) p_buf->p_buffer + 5, "co", 2)) { /* v2.3.43 */
+      int oref;
+      VALUE mclass;
+
+      p_buf->p_buffer[p_buf->data_size] = '\0';
+      oref = (int) strtol(p_buf->p_buffer + MG_RECV_HEAD, NULL, 10);
+
+      mclass = rb_funcall(mg_mclass, rb_intern("new"), 2, rb_int_new(oref), rb_int_new(phndle));
+
+      return mclass;
+   }
+
+   return rb_str_new(p_buf->p_buffer + MG_RECV_HEAD, p_buf->data_size - MG_RECV_HEAD);
+}
+
+
+static VALUE ex_mclass_close(VALUE self)
+{
+   return rb_str_new("", 0);
 }
 
 
@@ -3441,6 +3787,8 @@ void Init_mg_ruby() {
 #endif
 
    mg_ruby = rb_define_class("MG_RUBY", rb_cObject);
+
+   mg_mclass = ex_m_mclass(); /* v2.3.43 */
 /*
    rb_define_method(mg_ruby, "initialize", t_init, 0);
    rb_define_method(mg_ruby, "add", t_add, 1);
@@ -3636,15 +3984,22 @@ char * mg_get_string(VALUE item, VALUE * item_tmp, int * size)
 }
 
 
-int mg_get_vargs(int argc, VALUE *argv, MGVARGS *pvargs)
+int mg_get_vargs(int argc, VALUE *argv, MGVARGS *pvargs, int context)
 {
    int n;
 
-   for (n = 0; n < argc; n ++) {
-      pvargs->cvars[n].ps = (unsigned char *) mg_get_string(argv[n], &(pvargs->rvars[n]), &(pvargs->cvars[n].size));
-      if (n == 0) {
-         pvargs->global = (char *) pvargs->cvars[n].ps;
-         pvargs->global_len = pvargs->cvars[n].size;
+   if (context) {
+      for (n = 0; n < argc; n ++) {
+         pvargs->cvars[n].ps = (unsigned char *) mg_get_string(argv[n], &(pvargs->rvars[n]), &(pvargs->cvars[n].size));
+      }
+   }
+   else {
+      for (n = 0; n < argc; n ++) {
+         pvargs->cvars[n].ps = (unsigned char *) mg_get_string(argv[n], &(pvargs->rvars[n]), &(pvargs->cvars[n].size));
+         if (n == 0) {
+            pvargs->global = (char *) pvargs->cvars[n].ps;
+            pvargs->global_len = pvargs->cvars[n].size;
+         }
       }
    }
 
