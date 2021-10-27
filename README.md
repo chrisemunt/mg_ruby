@@ -3,9 +3,9 @@
 A Ruby Extension for InterSystems **Cache/IRIS** and **YottaDB**.
 
 Chris Munt <cmunt@mgateway.com>  
-20 April 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
+27 October 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
 
-* Current Release: Version: 2.3; Revision 43.
+* Current Release: Version: 2.3; Revision 44.
 * Two connectivity models to the InterSystems or YottaDB database are provided: High performance via the local database API or network based.
 * [Release Notes](#RelNotes) can be found at the end of this document.
 
@@ -544,3 +544,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 * Introduce improved support for InterSystems Objects for the standard (PHP/Python/Ruby) connectivity protocol.
 	* This enhancement requires DB Superserver version 4.2; Revision 19 (or later).
+
+### v2.3.44 (27 October 2021)
+
+* Ensure that data strings returned from YottaDB are correctly terminated.
+* Verify that **mg\_ruby** will build and work with Ruby v3.0.x.
