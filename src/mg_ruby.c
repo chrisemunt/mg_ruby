@@ -3,7 +3,7 @@
    | mg_ruby: Ruby Extension for M/Cache/IRIS                                 |
    | Author: Chris Munt cmunt@mgateway.com                                    |
    |                    chris.e.munt@gmail.com                                |
-   | Copyright (c) 2016-2020 M/Gateway Developments Ltd,                      |
+   | Copyright (c) 2019-2023 MGateway Ltd                                     |
    | Surrey UK.                                                               |
    | All rights reserved.                                                     |
    |                                                                          |
@@ -50,6 +50,9 @@ Version 2.3.43 20 April 2021:
 Version 2.3.44 27 October 2021:
    Ensure that data strings returned from YottaDB are correctly terminated.
    Verify that mg_ruby will build and work with Ruby v3.0.x.
+
+Version 2.3.44a 23 June 2023:
+   Documentation update.
 
 */
 
@@ -228,7 +231,7 @@ static VALUE ex_m_ext_version(VALUE self)
    str = mg_get_string(r_str, &r, &len);
    phndle = mg_get_integer(r_phndle);
 */
-   sprintf(buffer, "M/Gateway Developments Ltd. - mg_ruby: Ruby Gateway to M - Version %s", MG_VERSION);
+   sprintf(buffer, "MGateway Ltd. - mg_ruby: Ruby Gateway to M - Version %s", MG_VERSION);
 
    return rb_str_new2(buffer);
 }
