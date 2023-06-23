@@ -3,7 +3,7 @@
 A Ruby Extension for InterSystems **Cache/IRIS** and **YottaDB**.
 
 Chris Munt <cmunt@mgateway.com>  
-27 October 2021, M/Gateway Developments Ltd [http://www.mgateway.com](http://www.mgateway.com)
+23 June 2023, MGateway Ltd [http://www.mgateway.com](http://www.mgateway.com)
 
 * Current Release: Version: 2.3; Revision 44.
 * Two connectivity models to the InterSystems or YottaDB database are provided: High performance via the local database API or network based.
@@ -110,8 +110,8 @@ Change to your development Namespace and check the installation:
 
        do ^%zmgsi
 
-       M/Gateway Developments Ltd - Service Integration Gateway
-       Version: 4.0; Revision 16 (11 February 2021)
+       MGateway Ltd - Service Integration Gateway
+       Version: 4.5; Revision 28 (3 February 2023)
 
 
 #### Installation for YottaDB
@@ -139,8 +139,8 @@ Link all the **zmgsi** routines and check the installation:
 
        do ^%zmgsi
 
-       M/Gateway Developments Ltd - Service Integration Gateway
-       Version: 4.0; Revision 16 (11 February 2021)
+       MGateway Ltd - Service Integration Gateway
+       Version: 4.5; Revision 28 (3 February 2023)
 
 Note that the version of **zmgsi** is successfully displayed.
 
@@ -296,7 +296,7 @@ Before invoking database functionality, the following simple script can be used 
 
 This should return something like:
 
-       M/Gateway Developments Ltd. - mg_ruby: Ruby Gateway to M - Version 2.2.41
+       MGateway Ltd. - mg_ruby: Ruby Gateway to M - Version 2.3.44
 
 Now consider the following database script:
 
@@ -502,7 +502,7 @@ Calculate person's age at a particular date:
 
 ## <a name="License"></a> License
 
-Copyright (c) 2018-2021 M/Gateway Developments Ltd,
+Copyright (c) 2018-2023 MGateway Ltd,
 Surrey UK.                                                      
 All rights reserved.
  
@@ -549,3 +549,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 * Ensure that data strings returned from YottaDB are correctly terminated.
 * Verify that **mg\_ruby** will build and work with Ruby v3.0.x.
+
+### v2.3.44a (23 June 2023)
+
+* Documentation update.
